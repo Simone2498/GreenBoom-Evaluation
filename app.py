@@ -24,7 +24,7 @@ MODEL_FILTER = ["greenboom"]  # Lasciare vuoto [] per mostrare tutti i modelli
 # --- TEXTS IN ITALIAN ---
 
 TEXTS = {
-    "login_header": "Accesso Valutatore",
+    "login_header": "Accesso Valutatore V2",
     "username_label": "Nome Utente",
     "password_label": "Password",
     "login_button": "Accedi",
