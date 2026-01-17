@@ -1,0 +1,10 @@
+.env
+assets/
+greenevolution_test_db/
+__pycache__/
+
+law_agent.py
+tmp.txt
+preprocessing.ipynb
+analytics.ipynb
+final_df.xlsx
