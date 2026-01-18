@@ -141,7 +141,7 @@ def evaluation_page():
                         """)
 
     @st.cache_data(show_spinner="Caricamento test di valutazione...")
-    def _get_evaluation_queue_and_total_items(judge_id):
+    def _get_evaluation_queue_and_total_items(judge_id, model_filter):
         all_model_answers_flat = []
         evaluation_queue = []
         all_questions = list(questions_collection.find({}, {"_id": 1, "model_answers": 1}))
@@ -149,7 +149,7 @@ def evaluation_page():
         for q in all_questions:
             for i, ma in enumerate(q.get('model_answers', [])):
                 # Applica il filtro sui model_id se configurato
-                if MODEL_FILTER and ma.get('model_id') not in MODEL_FILTER:
+                if model_filter and ma.get('model_id') not in model_filter:
                     continue
                 
                 item = {'q_id': q['_id'], 'ma_idx': i}
@@ -163,7 +163,7 @@ def evaluation_page():
         return evaluation_queue, len(all_model_answers_flat)
 
     if 'evaluation_queue' not in st.session_state:
-        st.session_state.evaluation_queue, st.session_state.total_items = _get_evaluation_queue_and_total_items(st.session_state['judge_id'])
+        st.session_state.evaluation_queue, st.session_state.total_items = _get_evaluation_queue_and_total_items(st.session_state['judge_id'], tuple(MODEL_FILTER))
         st.session_state.evaluated_count = st.session_state.total_items - len(st.session_state.get('evaluation_queue', []))
         st.session_state.current_index = 0
     
