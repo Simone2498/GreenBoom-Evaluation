@@ -65,7 +65,7 @@ credentials = {
     "Giorgia": os.getenv("JUDGE3_PASSWORD"),
     "Debora": os.getenv("JUDGE4_PASSWORD"),
     "Gianni": os.getenv("JUDGE5_PASSWORD"),
-    "Marco": os.getenv("JUDGE5_PASSWORD"),
+    "Marco": os.getenv("JUDGE6_PASSWORD"),
 }
 
 class Evaluation(BaseModel):
