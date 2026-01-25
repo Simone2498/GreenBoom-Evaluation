@@ -140,34 +140,40 @@ def evaluation_page():
                         **Commento**: Se trovi allucinazioni o fornisci valutazioni particolarmente positive o negative, spiega il perché. \n\n
                         """)
 
-    @st.cache_data(show_spinner="Caricamento test di valutazione...")
     def _get_evaluation_queue_and_total_items(judge_id, model_filter):
         all_model_answers_flat = []
         evaluation_queue = []
         evaluated_count = 0
-        all_questions = list(questions_collection.find({}, {"_id": 1, "model_answers": 1}))
+        all_questions = list(questions_collection.find({}))
         
         for q in all_questions:
             for i, ma in enumerate(q.get('model_answers', [])):
+                model_id = ma.get('model_id')
+                evaluations = ma.get('evaluations', [])
+                
+                # Count how many times judge_id appears in evaluations (should be max 1 after cleanup)
+                judge_eval_count = sum(1 for e in evaluations if e.get('judge_id') == judge_id)
+                
                 # Applica il filtro sui model_id se configurato
-                if model_filter and ma.get('model_id') not in model_filter:
+                if model_filter and model_id not in model_filter:
                     continue
                 
                 item = {'q_id': q['_id'], 'ma_idx': i}
                 all_model_answers_flat.append(item)
                 
-                evaluators = [e['judge_id'] for e in ma.get('evaluations', [])]
-                if judge_id not in evaluators:
-                    evaluation_queue.append(item)
+                # Check if judge has already evaluated this specific item
+                if judge_eval_count > 0:
+                    evaluated_count += judge_eval_count
                 else:
-                    evaluated_count += 1
+                    evaluation_queue.append(item)  # Not evaluated yet, add to queue
         
         random.shuffle(evaluation_queue)
         return evaluation_queue, len(all_model_answers_flat), evaluated_count
 
     if 'evaluation_queue' not in st.session_state:
-        st.session_state.evaluation_queue, st.session_state.total_items, st.session_state.evaluated_count = _get_evaluation_queue_and_total_items(st.session_state['judge_id'], tuple(MODEL_FILTER))
-        st.session_state.current_index = 0
+        with st.spinner("Caricamento test di valutazione..."):
+            st.session_state.evaluation_queue, st.session_state.total_items, st.session_state.evaluated_count = _get_evaluation_queue_and_total_items(st.session_state['judge_id'], MODEL_FILTER)
+            st.session_state.current_index = 0
     
     # Progress Bar
     progress = st.session_state.evaluated_count / st.session_state.total_items if st.session_state.total_items > 0 else 0
@@ -217,32 +223,45 @@ def evaluation_page():
             submit_button = st.form_submit_button(TEXTS["submit_button"])
 
             if submit_button:
-                evaluation = Evaluation(
-                    judge_id=st.session_state['judge_id'],
-                    accuracy=accuracy, 
-                    completezza=completezza,
-                    comprensibilità=comprensibilità,
-                    precisione=precisione,
-                    gradevolezza=gradevolezza,
-                    allucinazione=allucinazione,
-                    esperto=esperto,
-                    comment=comment
-                )
-                questions_collection.update_one(
+                # First, check if this judge has already evaluated this item
+                current_doc = questions_collection.find_one(
                     {'_id': item['q_id']},
-                    {'$push': {f'model_answers.{item["ma_idx"]}.evaluations': evaluation.model_dump()}}
+                    {'model_answers': 1}
                 )
-                st.session_state.evaluated_count += 1
                 
-                # Remove from queue and move to next
-                st.session_state.evaluation_queue.pop(index)
+                existing_evaluations = current_doc['model_answers'][item['ma_idx']].get('evaluations', [])
+                judge_already_evaluated = any(e.get('judge_id') == st.session_state['judge_id'] for e in existing_evaluations)
                 
-                # Ensure index is not out of bounds for the next item
-                if st.session_state.current_index >= len(st.session_state.evaluation_queue):
-                    st.session_state.current_index = 0
-                
-                st.toast(TEXTS["eval_submitted_success"])
-                st.rerun()
+                if judge_already_evaluated:
+                    st.error("⚠️ Hai già valutato questa risposta! Non è possibile valutare due volte la stessa risposta.")
+                    st.warning("Passa alla domanda successiva usando il pulsante 'Avanti ➡️'")
+                else:
+                    evaluation = Evaluation(
+                        judge_id=st.session_state['judge_id'],
+                        accuracy=accuracy, 
+                        completezza=completezza,
+                        comprensibilità=comprensibilità,
+                        precisione=precisione,
+                        gradevolezza=gradevolezza,
+                        allucinazione=allucinazione,
+                        esperto=esperto,
+                        comment=comment
+                    )
+                    questions_collection.update_one(
+                        {'_id': item['q_id']},
+                        {'$push': {f'model_answers.{item["ma_idx"]}.evaluations': evaluation.model_dump()}}
+                    )
+                    st.session_state.evaluated_count += 1
+                    
+                    # Remove from queue and move to next
+                    st.session_state.evaluation_queue.pop(index)
+                    
+                    # Ensure index is not out of bounds for the next item
+                    if st.session_state.current_index >= len(st.session_state.evaluation_queue):
+                        st.session_state.current_index = 0
+                    
+                    st.toast(TEXTS["eval_submitted_success"])
+                    st.rerun()
 
     # Navigation (outside columns, but can be styled)
     nav_cols = st.columns([1, 8, 1])
