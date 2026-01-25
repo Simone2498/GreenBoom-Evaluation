@@ -144,6 +144,7 @@ def evaluation_page():
     def _get_evaluation_queue_and_total_items(judge_id, model_filter):
         all_model_answers_flat = []
         evaluation_queue = []
+        evaluated_count = 0
         all_questions = list(questions_collection.find({}, {"_id": 1, "model_answers": 1}))
         
         for q in all_questions:
@@ -158,13 +159,14 @@ def evaluation_page():
                 evaluators = [e['judge_id'] for e in ma.get('evaluations', [])]
                 if judge_id not in evaluators:
                     evaluation_queue.append(item)
+                else:
+                    evaluated_count += 1
         
         random.shuffle(evaluation_queue)
-        return evaluation_queue, len(all_model_answers_flat)
+        return evaluation_queue, len(all_model_answers_flat), evaluated_count
 
     if 'evaluation_queue' not in st.session_state:
-        st.session_state.evaluation_queue, st.session_state.total_items = _get_evaluation_queue_and_total_items(st.session_state['judge_id'], tuple(MODEL_FILTER))
-        st.session_state.evaluated_count = st.session_state.total_items - len(st.session_state.get('evaluation_queue', []))
+        st.session_state.evaluation_queue, st.session_state.total_items, st.session_state.evaluated_count = _get_evaluation_queue_and_total_items(st.session_state['judge_id'], tuple(MODEL_FILTER))
         st.session_state.current_index = 0
     
     # Progress Bar
